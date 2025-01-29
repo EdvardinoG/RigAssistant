@@ -293,13 +293,11 @@ class Selection_Tools(QWidget):
         pop_frame_layout = QVBoxLayout(pop_frame)
         pop_layout.addWidget(pop_frame)
         
-        btn1 = QPushButton("Select by Name")
-        btn2 = QPushButton("Rename All")
-        btn3 = QPushButton("Rename Manip")
+        btn1 = QPushButton("Create Ribbon")
+        btn2 = QPushButton("Make nHair")
         
         pop_frame_layout.addWidget(btn1)
         pop_frame_layout.addWidget(btn2)
-        pop_frame_layout.addWidget(btn3)
 
         self.setLayout(pop_layout)
 
