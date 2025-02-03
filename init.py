@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from shiboken6 import wrapInstance
 import maya.OpenMayaUI as omui
 import maya.cmds as cmds
+import maya.mel as mel
 
 def get_maya_window():
     get_window = omui.MQtUtil.mainWindow()
@@ -111,36 +112,6 @@ class EDG707_002(QMainWindow):
         sel_name_btn.clicked.connect(self.sel_Tool)
 
         tab_widget.addTab(tab_2, "Selection")
-
-    def create_ribbon(self):
-        sel = cmds.ls(sl=1, type="joint")
-
-        if not sel:
-            cmds.warning("You need to select at least 2 joints!")
-            return
-        curves_array = []
-        dist = 1
-
-        for i in sel:
-            pos = cmds.xform(i, q=1, t=1, ws=1)
-
-            mat = cmds.xform(i, q=1, m=1, ws=1)
-
-            x_axis = [mat[0], mat[1], mat[2]]
-            y_axis = [mat[4], mat[5], mat[6]]
-            z_axis = [mat[8], mat[9], mat[10]]
-
-            chosen_axis = z_axis
-
-            fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
-            snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
-
-            cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
-            
-            curves_array.append(cur)
-
-        loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=4, rn=1, po=0)
-        cmds.delete(curves_array)
 
     def controller_color(self):
         palette = QColorDialog.getColor()
@@ -313,7 +284,7 @@ class EDG707_002(QMainWindow):
 class Selection_Tools(QWidget):
     def __init__(self, parent=None):
         super(Selection_Tools, self).__init__(parent)
-        self.setWindowTitle("Outliner Tools")
+        self.setWindowTitle("Ribbon Tools")
         self.setGeometry(400, 100, 276, 100)
         
         pop_widget_layout = QVBoxLayout()
@@ -339,42 +310,105 @@ class Selection_Tools(QWidget):
         pop_frame_layout.addWidget(pop_inner_group)
 
         axis_label = QLabel("Nurbs Along:")
-
-        axis_x = QRadioButton("X Axis")
-        axis_y = QRadioButton("Y Axis")
-        axis_z = QRadioButton("Z Axis")
+        
+        self.axis_x = QRadioButton("X Axis")
+        self.axis_y = QRadioButton("Y Axis")
+        self.axis_z = QRadioButton("Z Axis")
+        
+        self.axis_x.setChecked(True)
         
         number_spans_label = QLabel("Number of Spans:")
-        s_slider = QSlider(Qt.Horizontal)
-        s_slider.setMinimum(1)
-        s_slider.setMaximum(10)
-        s_slider.setValue(4)
+        self.s_slider = QSlider(Qt.Horizontal)
+        self.s_slider.setMinimum(1)
+        self.s_slider.setMaximum(10)
+        self.s_slider.setValue(4)
 
         btn1 = QPushButton("Create Ribbon")
         btn2 = QPushButton("Make nHair")
         
         pop_inner_group_layout.addWidget(axis_label, 0, 0)
-        radio_grp.addButton(axis_x)
-        radio_grp.addButton(axis_y)
-        radio_grp.addButton(axis_z)
+        radio_grp.addButton(self.axis_x)
+        radio_grp.addButton(self.axis_y)
+        radio_grp.addButton(self.axis_z)
         
-        pop_inner_group_layout.addWidget(axis_x, 1, 0)
-        pop_inner_group_layout.addWidget(axis_y, 1, 1)
-        pop_inner_group_layout.addWidget(axis_z, 1, 2)
+        pop_inner_group_layout.addWidget(self.axis_x, 1, 0)
+        pop_inner_group_layout.addWidget(self.axis_y, 1, 1)
+        pop_inner_group_layout.addWidget(self.axis_z, 1, 2)
 
         pop_inner_group_layout.addWidget(number_spans_label, 2, 0, 1, 3)
         pop_inner_group_layout.addLayout(numbers_layout, 3, 0, 1, 3)
-        pop_inner_group_layout.addWidget(s_slider, 4, 0, 1, 3)
+        pop_inner_group_layout.addWidget(self.s_slider, 4, 0, 1, 3)
 
         pop_inner_group_layout.addWidget(btn1, 5, 0, 1, 3)
         pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
 
         self.setLayout(pop_widget_layout)
 
-        btn1.clicked.connect(self.call_ribbon_from_up)
+        btn1.clicked.connect(self.create_ribbon)
+        
+    def create_ribbon(self):
+        sel = cmds.ls(sl=1, type="joint")
 
-    def call_ribbon_from_up(self):
-        EDG707_002.create_ribbon(self)
+        if not sel:
+            cmds.warning("You need to select at least 2 joints!")
+            return
+        curves_array = []
+        dist = 1
+
+        for i in sel:
+            pos = cmds.xform(i, q=1, t=1, ws=1)
+
+            mat = cmds.xform(i, q=1, m=1, ws=1)
+
+            x_axis = [mat[0], mat[1], mat[2]]
+            y_axis = [mat[4], mat[5], mat[6]]
+            z_axis = [mat[8], mat[9], mat[10]]
+
+            if self.axis_x.isChecked():
+                chosen_axis = x_axis
+            elif self.axis_y.isChecked():
+                chosen_axis = y_axis
+            else:
+                chosen_axis = z_axis
+
+            fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
+            snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
+
+            cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
+            
+            curves_array.append(cur)
+
+        spans = self.s_slider.value()
+        edges = spans+1
+
+        loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=spans, rn=1, po=0)
+        
+        nHair = mel.eval(f"createHair {edges*2-1} 1 3 1 0 1 1 1 0 1 1 1")
+            
+        cmds.delete(curves_array)
+        
+        # Delete Additional Hair Object (Not needed for Ribbon)
+        hair = cmds.listRelatives(["*hairSystemShape*", "*pfxHairShape*"], parent=1)
+        nucl = cmds.ls(type="nucleus")
+        if len(hair)>0:
+            cmds.delete(hair, nucl)
+
+        fol_sh = cmds.ls("*loftedSurface*Follicle*", type="follicle") #Shape
+
+        fol = cmds.listRelatives(fol_sh, p=1) #Parent
+
+        fol_child = cmds.listRelatives(fol, c=1) #All
+        
+        fol_parent_grp = cmds.listRelatives(fol, p=1)
+
+        fol_child_grp = [] #Filtered
+
+        for i in fol_child:
+            if i not in fol_sh:
+                fol_child_grp.append(i)
+
+        cmds.delete(fol_child_grp)
+        # Deleted
 
 def show_window():
     window = EDG707_002()
