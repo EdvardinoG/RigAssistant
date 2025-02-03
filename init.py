@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QGroupBox, QColorDialog
+from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from shiboken6 import wrapInstance
@@ -111,6 +111,36 @@ class EDG707_002(QMainWindow):
         sel_name_btn.clicked.connect(self.sel_Tool)
 
         tab_widget.addTab(tab_2, "Selection")
+
+    def create_ribbon(self):
+        sel = cmds.ls(sl=1, type="joint")
+
+        if not sel:
+            cmds.warning("You need to select at least 2 joints!")
+            return
+        curves_array = []
+        dist = 1
+
+        for i in sel:
+            pos = cmds.xform(i, q=1, t=1, ws=1)
+
+            mat = cmds.xform(i, q=1, m=1, ws=1)
+
+            x_axis = [mat[0], mat[1], mat[2]]
+            y_axis = [mat[4], mat[5], mat[6]]
+            z_axis = [mat[8], mat[9], mat[10]]
+
+            chosen_axis = z_axis
+
+            fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
+            snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
+
+            cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
+            
+            curves_array.append(cur)
+
+        loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=4, rn=1, po=0)
+        cmds.delete(curves_array)
 
     def controller_color(self):
         palette = QColorDialog.getColor()
@@ -286,20 +316,65 @@ class Selection_Tools(QWidget):
         self.setWindowTitle("Outliner Tools")
         self.setGeometry(400, 100, 276, 100)
         
-        pop_layout = QVBoxLayout()
+        pop_widget_layout = QVBoxLayout()
+
+        radio_grp = QButtonGroup()
+
+        numbers_layout = QHBoxLayout()
+        number_labels = []
         
+        for i in range(1, 11):
+            label = QLabel(str(i))
+            label.setAlignment(Qt.AlignCenter)
+            numbers_layout.addWidget(label)
+            number_labels.append(label)
+
         pop_frame = QFrame()
         pop_frame.setFrameShape(QFrame.StyledPanel)
         pop_frame_layout = QVBoxLayout(pop_frame)
-        pop_layout.addWidget(pop_frame)
+        pop_widget_layout.addWidget(pop_frame)
+
+        pop_inner_group = QGroupBox()
+        pop_inner_group_layout = QGridLayout(pop_inner_group)
+        pop_frame_layout.addWidget(pop_inner_group)
+
+        axis_label = QLabel("Nurbs Along:")
+
+        axis_x = QRadioButton("X Axis")
+        axis_y = QRadioButton("Y Axis")
+        axis_z = QRadioButton("Z Axis")
         
+        number_spans_label = QLabel("Number of Spans:")
+        s_slider = QSlider(Qt.Horizontal)
+        s_slider.setMinimum(1)
+        s_slider.setMaximum(10)
+        s_slider.setValue(4)
+
         btn1 = QPushButton("Create Ribbon")
         btn2 = QPushButton("Make nHair")
         
-        pop_frame_layout.addWidget(btn1)
-        pop_frame_layout.addWidget(btn2)
+        pop_inner_group_layout.addWidget(axis_label, 0, 0)
+        radio_grp.addButton(axis_x)
+        radio_grp.addButton(axis_y)
+        radio_grp.addButton(axis_z)
+        
+        pop_inner_group_layout.addWidget(axis_x, 1, 0)
+        pop_inner_group_layout.addWidget(axis_y, 1, 1)
+        pop_inner_group_layout.addWidget(axis_z, 1, 2)
 
-        self.setLayout(pop_layout)
+        pop_inner_group_layout.addWidget(number_spans_label, 2, 0, 1, 3)
+        pop_inner_group_layout.addLayout(numbers_layout, 3, 0, 1, 3)
+        pop_inner_group_layout.addWidget(s_slider, 4, 0, 1, 3)
+
+        pop_inner_group_layout.addWidget(btn1, 5, 0, 1, 3)
+        pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
+
+        self.setLayout(pop_widget_layout)
+
+        btn1.clicked.connect(self.call_ribbon_from_up)
+
+    def call_ribbon_from_up(self):
+        EDG707_002.create_ribbon(self)
 
 def show_window():
     window = EDG707_002()
