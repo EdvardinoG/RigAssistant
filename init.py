@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider
+=======
+from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from shiboken6 import wrapInstance
@@ -115,6 +119,7 @@ class EDG707_002(QMainWindow):
 
         tab_widget.addTab(tab_2, "Selection")
 
+<<<<<<< HEAD
     def show_ribbon_tool(self):
         
         self.rib_wid = Ribbon_Tool(self)
@@ -126,6 +131,37 @@ class EDG707_002(QMainWindow):
         self.ren_wid = Rename_Manip(self)
         self.ren_wid.setWindowFlags(Qt.WindowType.Window)
         self.ren_wid.show()
+=======
+    def create_ribbon(self):
+        sel = cmds.ls(sl=1, type="joint")
+
+        if not sel:
+            cmds.warning("You need to select at least 2 joints!")
+            return
+        curves_array = []
+        dist = 1
+
+        for i in sel:
+            pos = cmds.xform(i, q=1, t=1, ws=1)
+
+            mat = cmds.xform(i, q=1, m=1, ws=1)
+
+            x_axis = [mat[0], mat[1], mat[2]]
+            y_axis = [mat[4], mat[5], mat[6]]
+            z_axis = [mat[8], mat[9], mat[10]]
+
+            chosen_axis = z_axis
+
+            fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
+            snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
+
+            cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
+            
+            curves_array.append(cur)
+
+        loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=4, rn=1, po=0)
+        cmds.delete(curves_array)
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
 
     def controller_color(self):
         palette = QColorDialog.getColor()
@@ -313,19 +349,30 @@ class Ribbon_Tool(QWidget):
         super(Ribbon_Tool, self).__init__(parent)
         self.setWindowTitle("Ribbon Tools")
         self.setGeometry(400, 100, 276, 100)
+<<<<<<< HEAD
 
         self.setWindowFlag(Qt.Tool)
 
+=======
+        
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
         pop_widget_layout = QVBoxLayout()
 
         radio_grp = QButtonGroup()
 
         numbers_layout = QHBoxLayout()
         number_labels = []
+<<<<<<< HEAD
 
         for i in range(1, 11):
             label = QLabel(str(i))
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+=======
+        
+        for i in range(1, 11):
+            label = QLabel(str(i))
+            label.setAlignment(Qt.AlignCenter)
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
             numbers_layout.addWidget(label)
             number_labels.append(label)
 
@@ -340,6 +387,7 @@ class Ribbon_Tool(QWidget):
 
         axis_label = QLabel("Nurbs Along:")
 
+<<<<<<< HEAD
         self.axis_x = QRadioButton("X Axis")
         self.axis_y = QRadioButton("Y Axis")
         self.axis_z = QRadioButton("Z Axis")
@@ -351,6 +399,17 @@ class Ribbon_Tool(QWidget):
         self.s_slider.setMinimum(1)
         self.s_slider.setMaximum(10)
         self.s_slider.setValue(4)
+=======
+        axis_x = QRadioButton("X Axis")
+        axis_y = QRadioButton("Y Axis")
+        axis_z = QRadioButton("Z Axis")
+        
+        number_spans_label = QLabel("Number of Spans:")
+        s_slider = QSlider(Qt.Horizontal)
+        s_slider.setMinimum(1)
+        s_slider.setMaximum(10)
+        s_slider.setValue(4)
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
 
         btn1 = QPushButton("Create Ribbon")
         #btn2 = QPushButton("Make nHair")
@@ -378,12 +437,37 @@ class Ribbon_Tool(QWidget):
     def create_ribbon(self):
         sel = cmds.ls(sl=1, type="joint")
         
+<<<<<<< HEAD
         if len(sel) == 2:
             curves_array = []
             dist = 1
 
             for i in sel:
                 pos = cmds.xform(i, q=1, t=1, ws=1)
+=======
+        pop_inner_group_layout.addWidget(axis_label, 0, 0)
+        radio_grp.addButton(axis_x)
+        radio_grp.addButton(axis_y)
+        radio_grp.addButton(axis_z)
+        
+        pop_inner_group_layout.addWidget(axis_x, 1, 0)
+        pop_inner_group_layout.addWidget(axis_y, 1, 1)
+        pop_inner_group_layout.addWidget(axis_z, 1, 2)
+
+        pop_inner_group_layout.addWidget(number_spans_label, 2, 0, 1, 3)
+        pop_inner_group_layout.addLayout(numbers_layout, 3, 0, 1, 3)
+        pop_inner_group_layout.addWidget(s_slider, 4, 0, 1, 3)
+
+        pop_inner_group_layout.addWidget(btn1, 5, 0, 1, 3)
+        pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
+
+        self.setLayout(pop_widget_layout)
+
+        btn1.clicked.connect(self.call_ribbon_from_up)
+
+    def call_ribbon_from_up(self):
+        EDG707_002.create_ribbon(self)
+>>>>>>> b3034a503f40043902171e9deea463720e1efeb6
 
                 mat = cmds.xform(i, q=1, m=1, ws=1)
 
