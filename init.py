@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider
+from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from shiboken6 import wrapInstance
@@ -15,7 +15,7 @@ class EDG707_002(QMainWindow):
         super(EDG707_002, self).__init__(get_maya_window())
         self.setWindowTitle("EDG AutoRig Assistant")
         self.setMaximumSize(400, 600)
-        self.setWindowFlag(Qt.Tool)
+        self.setWindowFlag(Qt.WindowType.Tool)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -23,13 +23,13 @@ class EDG707_002(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         frame = QFrame()
-        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
         frame_layout = QVBoxLayout(frame)
         main_layout.addWidget(frame)
 
 
         logo = QLabel("EDG")
-        logo.setAlignment(Qt.AlignCenter)
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         frame_layout.addWidget(logo)
 
         #Tab Set
@@ -42,7 +42,7 @@ class EDG707_002(QMainWindow):
         
         #
         jnt_manip_grp = QGroupBox("Joint's Manipulators")
-        jnt_manip_grp.setAlignment(Qt.AlignCenter)
+        jnt_manip_grp.setAlignment(Qt.AlignmentFlag.AlignCenter)
         jnt_manip_grp_layout = QGridLayout(jnt_manip_grp)
 
         ikCreate_button = QPushButton("Create IK")
@@ -57,7 +57,7 @@ class EDG707_002(QMainWindow):
         
         #
         ctrl_grp = QGroupBox("Controls Editor")
-        ctrl_grp.setAlignment(Qt.AlignCenter)
+        ctrl_grp.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ctrl_grp_layout = QGridLayout(ctrl_grp)
         
         controller_button = QPushButton("Create Controller")
@@ -68,7 +68,7 @@ class EDG707_002(QMainWindow):
         
         #
         color_grp = QGroupBox("Color Override")
-        color_grp.setAlignment(Qt.AlignCenter)
+        color_grp.setAlignment(Qt.AlignmentFlag.AlignCenter)
         color_grp_layout = QVBoxLayout(color_grp)
         
         override_color = QPushButton("Change Controller Color")
@@ -86,7 +86,7 @@ class EDG707_002(QMainWindow):
         tab_2_layout = QVBoxLayout(tab_2)
 
         sel_grp = QGroupBox("Selection Tools")
-        sel_grp.setAlignment(Qt.AlignCenter)
+        sel_grp.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sel_grp_layout = QVBoxLayout(sel_grp)
 
         tab_2_layout.addWidget(sel_grp)
@@ -94,7 +94,7 @@ class EDG707_002(QMainWindow):
         sel_grp.setMaximumSize(400, 120)
 
         sel_name_btn = QPushButton("Select by Name")
-        ren_all_btn = QPushButton("Rename All")
+        ren_all_btn = QPushButton("Rename Selected")
         ren_manip_btn = QPushButton("Rename Manip")
 
         sel_grp_layout.addWidget(sel_name_btn)
@@ -108,10 +108,24 @@ class EDG707_002(QMainWindow):
 
         controller_button.clicked.connect(self.create_Controller)
         grouping_button.clicked.connect(self.create_Group)
-        ribbon_tool.clicked.connect(self.show_outliner_tool)
+        ribbon_tool.clicked.connect(self.show_ribbon_tool)
         sel_name_btn.clicked.connect(self.sel_Tool)
+        ren_all_btn.clicked.connect(self.rename_All_Tool)
+        ren_manip_btn.clicked.connect(self.show_Rename_Manip)
 
         tab_widget.addTab(tab_2, "Selection")
+
+    def show_ribbon_tool(self):
+        
+        self.rib_wid = Ribbon_Tool(self)
+        self.rib_wid.setWindowFlags(Qt.WindowType.Window)
+        self.rib_wid.show()
+
+    def show_Rename_Manip(self):
+
+        self.ren_wid = Rename_Manip(self)
+        self.ren_wid.setWindowFlags(Qt.WindowType.Window)
+        self.ren_wid.show()
 
     def controller_color(self):
         palette = QColorDialog.getColor()
@@ -135,12 +149,6 @@ class EDG707_002(QMainWindow):
         for jnt in jointList:
             currentStateJnts = cmds.getAttr(jnt + ".displayLocalAxis")
             cmds.setAttr(jnt + ".displayLocalAxis", not currentStateJnts)
-
-    def show_outliner_tool(self):
-        
-        self.popup = Selection_Tools(self)
-        self.popup.setWindowFlags(Qt.Window)
-        self.popup.show()
 
     def find_perf_vect(self):
         sel = cmds.ls(sl=1, type="joint")
@@ -262,7 +270,7 @@ class EDG707_002(QMainWindow):
         
         get_word = cmds.promptDialog(
             title = "Selection Tool",
-            message = "Write word you want to find",
+            message = "Select:",
             button = ["OK","Cancel"],
             defaultButton = "OK",
             cancelButton = "Cancel",
@@ -281,27 +289,48 @@ class EDG707_002(QMainWindow):
             result = selectWord + selected
             cmds.select(result)
 
-class Selection_Tools(QWidget):
+    def rename_All_Tool(self):
+        
+        selected = cmds.ls(sl=1)
+        
+        get_word = cmds.promptDialog(
+            title = "Rename Tool",
+            message = "Rename to:",
+            button = ["OK","Cancel"],
+            defaultButton = "OK",
+            cancelButton = "Cancel",
+            dismissString = "Cancel",
+        )
+
+        if get_word == "OK":
+            what_word = cmds.promptDialog(q=1, text=1)
+        
+        for i in selected:
+            rename = cmds.rename(i, what_word)
+
+class Ribbon_Tool(QWidget):
     def __init__(self, parent=None):
-        super(Selection_Tools, self).__init__(parent)
+        super(Ribbon_Tool, self).__init__(parent)
         self.setWindowTitle("Ribbon Tools")
         self.setGeometry(400, 100, 276, 100)
-        
+
+        self.setWindowFlag(Qt.Tool)
+
         pop_widget_layout = QVBoxLayout()
 
         radio_grp = QButtonGroup()
 
         numbers_layout = QHBoxLayout()
         number_labels = []
-        
+
         for i in range(1, 11):
             label = QLabel(str(i))
-            label.setAlignment(Qt.AlignCenter)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             numbers_layout.addWidget(label)
             number_labels.append(label)
 
         pop_frame = QFrame()
-        pop_frame.setFrameShape(QFrame.StyledPanel)
+        pop_frame.setFrameShape(QFrame.Shape.StyledPanel)
         pop_frame_layout = QVBoxLayout(pop_frame)
         pop_widget_layout.addWidget(pop_frame)
 
@@ -310,27 +339,27 @@ class Selection_Tools(QWidget):
         pop_frame_layout.addWidget(pop_inner_group)
 
         axis_label = QLabel("Nurbs Along:")
-        
+
         self.axis_x = QRadioButton("X Axis")
         self.axis_y = QRadioButton("Y Axis")
         self.axis_z = QRadioButton("Z Axis")
-        
+
         self.axis_x.setChecked(True)
-        
+
         number_spans_label = QLabel("Number of Spans:")
-        self.s_slider = QSlider(Qt.Horizontal)
+        self.s_slider = QSlider(Qt.Orientation.Horizontal)
         self.s_slider.setMinimum(1)
         self.s_slider.setMaximum(10)
         self.s_slider.setValue(4)
 
         btn1 = QPushButton("Create Ribbon")
-        btn2 = QPushButton("Make nHair")
-        
+        #btn2 = QPushButton("Make nHair")
+
         pop_inner_group_layout.addWidget(axis_label, 0, 0)
         radio_grp.addButton(self.axis_x)
         radio_grp.addButton(self.axis_y)
         radio_grp.addButton(self.axis_z)
-        
+
         pop_inner_group_layout.addWidget(self.axis_x, 1, 0)
         pop_inner_group_layout.addWidget(self.axis_y, 1, 1)
         pop_inner_group_layout.addWidget(self.axis_z, 1, 2)
@@ -340,77 +369,136 @@ class Selection_Tools(QWidget):
         pop_inner_group_layout.addWidget(self.s_slider, 4, 0, 1, 3)
 
         pop_inner_group_layout.addWidget(btn1, 5, 0, 1, 3)
-        pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
+        #pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
 
         self.setLayout(pop_widget_layout)
 
         btn1.clicked.connect(self.create_ribbon)
-        
+
     def create_ribbon(self):
         sel = cmds.ls(sl=1, type="joint")
+        
+        if len(sel) == 2:
+            curves_array = []
+            dist = 1
 
-        if not sel:
-            cmds.warning("You need to select at least 2 joints!")
-            return
-        curves_array = []
-        dist = 1
+            for i in sel:
+                pos = cmds.xform(i, q=1, t=1, ws=1)
 
-        for i in sel:
-            pos = cmds.xform(i, q=1, t=1, ws=1)
+                mat = cmds.xform(i, q=1, m=1, ws=1)
 
-            mat = cmds.xform(i, q=1, m=1, ws=1)
+                x_axis = [mat[0], mat[1], mat[2]]
+                y_axis = [mat[4], mat[5], mat[6]]
+                z_axis = [mat[8], mat[9], mat[10]]
 
-            x_axis = [mat[0], mat[1], mat[2]]
-            y_axis = [mat[4], mat[5], mat[6]]
-            z_axis = [mat[8], mat[9], mat[10]]
+                if self.axis_x.isChecked():
+                    chosen_axis = x_axis
+                elif self.axis_y.isChecked():
+                    chosen_axis = y_axis
+                else:
+                    chosen_axis = z_axis
 
-            if self.axis_x.isChecked():
-                chosen_axis = x_axis
-            elif self.axis_y.isChecked():
-                chosen_axis = y_axis
-            else:
-                chosen_axis = z_axis
+                fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
+                snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
 
-            fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
-            snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
+                cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
 
-            cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
+                curves_array.append(cur)
+
+            spans = self.s_slider.value()
+            jnts_cnt_nHair = len(sel)-1 
+            edges = spans * jnts_cnt_nHair +1
+
+            loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=spans, rn=1, po=0)
+
+            existing_follicles = set(cmds.ls(type="follicle"))
+
+            nHair = mel.eval(f"createHair {edges} 1 3 1 0 1 1 1 0 1 1 1")
+
+            created_follicles = set(cmds.ls(type="follicle")) - existing_follicles
+
+            cmds.delete(curves_array)
+
+            # Delete Additional Hair Object (Not needed for Ribbon)
+            hair = cmds.listRelatives(["*hairSystemShape*", "*pfxHairShape*"], parent=1)
+            nucl = cmds.ls(type="nucleus")
+            if len(hair)>0:
+                cmds.delete(hair, nucl)
+
+            fol_sh = cmds.ls("*loftedSurface*Follicle*", type="follicle") #Shape
+            fol = cmds.listRelatives(fol_sh, p=1) #Parent
+            fol_child = cmds.listRelatives(fol, c=1) #All
+            fol_parent_grp = cmds.listRelatives(fol, p=1)
+
+            fol_child_grp = [] #Filtered
+
+            for i in fol_child:
+                if i not in fol_sh:
+                    fol_child_grp.append(i)
+
+            cmds.delete(fol_child_grp)
+            # Deleted
+
+            created_follicles_nonShape = cmds.listRelatives(created_follicles, p=1)
             
-            curves_array.append(cur)
+            #Create Joints in the position of follicles
+            for i in created_follicles_nonShape:
+                cmds.select(clear=True)
+                jnt2create = cmds.joint(n=i+"_JNT", p=[0,0,0])
+                jnt_constr = cmds.parentConstraint(i, jnt2create)
+                cmds.delete(jnt_constr)
 
-        spans = self.s_slider.value()
-        edges = spans+1
+        else:
+            cmds.warning("You need to select 2 joints!")
 
-        loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=spans, rn=1, po=0)
-        
-        nHair = mel.eval(f"createHair {edges*2-1} 1 3 1 0 1 1 1 0 1 1 1")
+class Rename_Manip(QWidget):
+    def __init__(self, parent=None):
+        super(Rename_Manip, self).__init__(parent)
+
+        self.setWindowTitle("Renaming Control")
+        self.setGeometry(500, 200, 276, 100)
+
+        self.setWindowFlag(Qt.WindowType.Tool)
+
+        self.sel_widget_layout = QVBoxLayout()
+
+        self.frame = QFrame()
+        self.frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_layout = QVBoxLayout(self.frame)
+
+        self.txt_bef = QLabel("Search for:")
+        self.txt_1 = QLineEdit()
+        self.txt_aft = QLabel("Replace with:")
+        self.txt_2 = QLineEdit()
+        self.ok_btn = QPushButton("Ok")
+
+        self.frame_layout.addWidget(self.txt_bef)
+        self.frame_layout.addWidget(self.txt_1)
+        self.frame_layout.addWidget(self.txt_aft)
+        self.frame_layout.addWidget(self.txt_2)
+        self.frame_layout.addWidget(self.ok_btn)
+        self.sel_widget_layout.addWidget(self.frame)                
+
+        self.setLayout(self.sel_widget_layout)
+
+        self.ok_btn.clicked.connect(self.rename_selected)
+
+    def rename_selected(self):
+        search_text = self.txt_1.text()
+        replace_text = self.txt_2.text()
+
+        sel_obj = cmds.ls(sl=True)
+
+        for i in sel_obj:
+            # Replace only part of the name
+            new_name = i.replace(search_text, replace_text)
             
-        cmds.delete(curves_array)
-        
-        # Delete Additional Hair Object (Not needed for Ribbon)
-        hair = cmds.listRelatives(["*hairSystemShape*", "*pfxHairShape*"], parent=1)
-        nucl = cmds.ls(type="nucleus")
-        if len(hair)>0:
-            cmds.delete(hair, nucl)
+            # Rename only if the name has changed
+            if new_name != i:
+                cmds.rename(i, new_name)
 
-        fol_sh = cmds.ls("*loftedSurface*Follicle*", type="follicle") #Shape
 
-        fol = cmds.listRelatives(fol_sh, p=1) #Parent
-
-        fol_child = cmds.listRelatives(fol, c=1) #All
-        
-        fol_parent_grp = cmds.listRelatives(fol, p=1)
-
-        fol_child_grp = [] #Filtered
-
-        for i in fol_child:
-            if i not in fol_sh:
-                fol_child_grp.append(i)
-
-        cmds.delete(fol_child_grp)
-        # Deleted
-
-def show_window():
+def show_window():                                          
     window = EDG707_002()
     window.show()
 
