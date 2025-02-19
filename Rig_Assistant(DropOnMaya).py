@@ -1,4 +1,33 @@
 try:
+    import base64
+    import os
+    from PySide6.QtGui import QPixmap
+    from PySide6.QtCore import Qt
+    from shiboken6 import wrapInstance
+    import maya.OpenMayaUI as omui
+    import maya.cmds as cmds
+    import maya.mel as mel
+except ImportError:
+    import base64
+    import os
+    from PySide2.QtGui import QPixmap
+    from PySide2.QtCore import Qt
+    from shiboken2 import wrapInstance
+    import maya.OpenMayaUI as omui
+    import maya.cmds as cmds
+    import maya.mel as mel
+
+image_data = b"iVBORw0KGgoAAAANSUhEUgAAADUAAAAjCAYAAAA0aUL2AAAACXBIWXMAAAsSAAALEgHS3X78AAACw0lEQVRYhe2Yv24TQRDGf0FICE2By1DleIL4DXx5AsITkEcIBRVFQoMo/QaENzBPwKahvhRUUFy6SDSOxEh0obi5eG/Zu9uzZQVb/qTTrefGs/PNn72x9+7u7tg2PHpoB9aBHalNwY7UpmArST1+aAdCqOo+MAb27XpujyZAAbwVkV9dNtZOSlVHVE5i95Gtc8ABMxEpTPcE+NRh7tC+c9G1594yL19VDZ0DyOyCyvljW39NMPlCREpVnQPPenQ/iMi7LoVBmVLVGfAyUb0AThJ1M1XNaBJ6T5WVAijpJ3uPoQdFnqh3LSJzFmUHcAu8Ao6Az4F+EbE9FRFndmpCV8D3vs2TMxWJZBec3X1ShYjMzNapJ78WkbmVdCjL7fMbFuX+rW/zIeWXR2SXwLmtSxEp6wd2QBx6us5bjyPyRgCMUKwfp32ODiE1jsimIuIi8ph+fcKNgANfHpMRD2Jd1p1YlZTr0M9bdGPyNl2As8T97jGE1CQiO/XqPqOK9pFl758esXUjOCJSqOpxIHMAqlrSJFWkOJpEKmhiH2cRWWn3Ro9469xbX0ZkqOoFzfdeDdfiRwOpmWojFeLWXqJhj4xU9dzs+Bl3LXZeR2RX9eTRh1RSeYLOLYvxJdSfEC9fZ/ei5Xltd0bCqVdjlUwd1Q5FTqS+zF4B53XviMipqk6pglGaztybCTOqqWOckq2k2U9VQ6VrEck69KdATXTOoqcaAfAOmbahd0LVdw5wHa+PBnoz5W3so9W49dMscDC3q476QeSrUJVawUASIVLKL1ZKmdf4flS/UNV+ymQOFQnHgkTSQdCHZUm1NX7bJFBjLSRCpJDKB9hzQGNYZfHzYW0kQnQeFKr6BPiTaOtSRHKbwOdUJMrVXRyOPlJPgY/28Qfw266fJrsRkZu1ergElvo5/79jK/8i25HaFOxIbQq2ktRfaLEGxyXdCS4AAAAASUVORK5CYII="
+
+def save_decoded_image():
+    icon_path = cmds.internalVar(userPrefDir=True) + "icons/EDG_Icon.png"
+    with open(icon_path, "wb") as icon_file:
+        icon_file.write(base64.b64decode(image_data))
+    return icon_path
+
+def create_shelf_button():
+    button_command = """
+try:
     from PySide6 import QtWidgets, QtCore, QtGui
     from PySide6.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
     from PySide6.QtGui import QColor, QPixmap, QFont
@@ -11,7 +40,7 @@ try:
     import maya.cmds as cmds
     import maya.mel as mel
 except ImportError:
-    from PySide6 import QtWidgets, QtCore, QtGui
+    from PySide2 import QtWidgets, QtCore, QtGui
     from PySide2.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
     from PySide2.QtGui import QColor, QPixmap, QFont
     from PySide2.QtCore import Qt, QByteArray
@@ -833,3 +862,32 @@ def show_window():
     window.show()
 
 show_window()
+"""
+    
+    # Decode and save image
+    icon_path = save_decoded_image()
+
+    gShelfTopLevel = mel.eval("$tmpVar=$gShelfTopLevel")
+    if gShelfTopLevel:
+        current_shelf = cmds.tabLayout(gShelfTopLevel, query=True, selectTab=True)
+        shelf_button = cmds.shelfButton(
+            parent=current_shelf,
+            command=button_command,
+            annotation="Open EDG Rig Tool",
+            image=icon_path,
+            overlayLabelColor=[1, 1, 1],
+            overlayLabelBackColor=[0, 0, 0, 0],
+            backgroundColor=[0, 0, 0],
+            sourceType="python"
+        )
+        print("Button Created:", shelf_button)
+    else:
+        cmds.warning("No active shelf found!")
+
+def onMayaDroppedPythonFile(*args, **kwargs):
+    create_shelf_button()
+
+if __name__ == "__main__":
+    onMayaDroppedPythonFile()
+
+#Special thanks to RETSYN and MUNORR!
