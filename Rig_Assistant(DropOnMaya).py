@@ -40,7 +40,7 @@ try:
     import maya.cmds as cmds
     import maya.mel as mel
 except ImportError:
-    from PySide2 import QtWidgets, QtCore, QtGui
+    from PySide6 import QtWidgets, QtCore, QtGui
     from PySide2.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
     from PySide2.QtGui import QColor, QPixmap, QFont
     from PySide2.QtCore import Qt, QByteArray
@@ -843,18 +843,34 @@ class Rename_Manip(QWidget):
     def rename_selected(self):
         search_text = self.txt_1.text()
         replace_text = self.txt_2.text()
-
-        sel_obj = cmds.ls(sl=True)
-
-        for i in sel_obj:
-            # Replace only part of the name
-            new_name = i.replace(search_text, replace_text)
+        
+        sel = cmds.ls(sl=True, l=True)
+        
+        #Sort by hirarchy, more | the object has, the deeper selection is
+        reverse_sel = sorted(sel, key = lambda x: x.count("|"), reverse=True)
+        
+        #For counting the number of objects
+        renamed_obj = []
+        
+        for i in reverse_sel:
+            #Get last name of the short name
+            short_name = i.split("|")[-1]
             
-            # Rename only if the name has changed
-            if new_name != i:
-                cmds.rename(i, new_name)
+            if search_text in short_name:
+                #Create new name
+                new_name = short_name.replace(search_text, replace_text)
                 
+                if cmds.objExists(i):
+                    #Paste the naming onto object
+                    new_name_paste = cmds.rename(i, new_name)
+                    renamed_obj.append(new_name_paste)
+                    print(f"SUCCESS: Renamed {short_name} → {new_name}")
+        
+        cmds.select(renamed_obj)
+                    
+        cmds.warning(f"SUMMARY: Renamed {len(renamed_obj)} of {len(sel)} objects!")
         self.close()
+
 
 
 def show_window():                                          
