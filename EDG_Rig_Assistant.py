@@ -29,9 +29,9 @@ def create_shelf_button():
     button_command = """
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide6.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
-    from PySide6.QtGui import QColor, QPixmap, QFont
-    from PySide6.QtCore import Qt, QByteArray
+    from PySide6.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QDoubleSpinBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
+    from PySide6.QtGui import QColor, QPixmap, QFont, QDrag
+    from PySide6.QtCore import Qt, QByteArray, QMimeData, QTimer
     import base64
     import os
     import pickle
@@ -40,10 +40,10 @@ try:
     import maya.cmds as cmds
     import maya.mel as mel
 except ImportError:
-    from PySide6 import QtWidgets, QtCore, QtGui
-    from PySide2.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
-    from PySide2.QtGui import QColor, QPixmap, QFont
-    from PySide2.QtCore import Qt, QByteArray
+    from PySide2 import QtWidgets, QtCore, QtGui
+    from PySide2.QtWidgets import QMainWindow, QWidget, QApplication, QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QTabWidget, QLabel, QLineEdit, QGroupBox, QDoubleSpinBox, QColorDialog, QButtonGroup, QRadioButton, QSlider, QTextEdit, QDialogButtonBox
+    from PySide2.QtGui import QColor, QPixmap, QFont, QDrag
+    from PySide2.QtCore import Qt, QByteArray, QMimeData, QTimer
     import base64
     import os
     import pickle
@@ -56,12 +56,93 @@ def get_maya_window():
     get_window = omui.MQtUtil.mainWindow()
     return wrapInstance(int(get_window), QMainWindow)
 
+class DraggableButton(QtWidgets.QPushButton):
+    def __init__(self, text, parent=None):
+        super(DraggableButton, self).__init__(text, parent)
+        self.setAcceptDrops(True)
+        self.code = ""  # Initialize the code attribute
+        self.drag_start_position = None  # Store the position where the drag starts
+        self.drag_timer = QTimer(self)  # Timer for drag delay
+        self.drag_timer.timeout.connect(self.start_drag)  # Connect timer to drag start
+        self.is_dragging = False  # Track whether a drag operation is in progress
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # Store the position where the mouse was pressed
+            self.drag_start_position = event.pos()
+            # Start the timer for the drag delay (e.g., 500 ms)
+            self.drag_timer.start(150)  # Adjust the delay as needed
+        super(DraggableButton, self).mousePressEvent(event)  # Call parent class's mousePressEvent
+
+    def mouseReleaseEvent(self, event):
+        # Stop the timer if the mouse is released before the drag starts
+        self.drag_timer.stop()
+        if not self.is_dragging:
+            # If not dragging, allow the button to emit the clicked signal
+            super(DraggableButton, self).mouseReleaseEvent(event)
+        else:
+            # If dragging, reset the button's state
+            self.setDown(False)
+            self.is_dragging = False  # Reset the dragging flag
+
+    def mouseMoveEvent(self, event):
+        # Stop the timer if the mouse moves outside the button before the drag starts
+        if self.drag_start_position is not None:
+            if (event.pos() - self.drag_start_position).manhattanLength() > 10:  # Small movement threshold
+                self.drag_timer.stop()
+        super(DraggableButton, self).mouseMoveEvent(event)  # Call parent class's mouseMoveEvent
+
+    def start_drag(self):
+        # Stop the timer
+        self.drag_timer.stop()
+        # Set the dragging flag
+        self.is_dragging = True
+        # Start the drag operation
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setText(self.text())
+        mime.setData('application/x-button-code', self.code.encode())
+        drag.setMimeData(mime)
+        # Execute the drag operation
+        drag.exec_(Qt.MoveAction)
+        # Reset the button's state after the drag operation
+        self.setDown(False)
+        self.is_dragging = False  # Reset the dragging flag
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        source_button = event.source()
+        target_button = self
+        
+        # Get the layout and indexes
+        layout = self.parent().layout()
+        source_index = layout.indexOf(source_button)
+        target_index = layout.indexOf(target_button)
+        
+        if source_index != -1 and target_index != -1:
+            # Remove and reinsert widgets to reorder them
+            layout.removeWidget(source_button)
+            layout.removeWidget(target_button)
+            
+            # Swap positions
+            if source_index > target_index:
+                layout.insertWidget(target_index, source_button)
+                layout.insertWidget(source_index, target_button)
+            else:
+                layout.insertWidget(source_index, target_button)
+                layout.insertWidget(target_index, source_button)
+
 class EDG707_002(QMainWindow):
     def __init__(self):
         super(EDG707_002, self).__init__(get_maya_window())
         
         self.setAcceptDrops(True)
 
+        self.dist_spinBox_UI = CreatePoleV()
+        
         #Setup the UI
         self.setWindowTitle("Rig Assistant")
         self.setMaximumSize(400, 600)
@@ -90,13 +171,13 @@ class EDG707_002(QMainWindow):
         tab_1 = QWidget()
         tab1_layout = QVBoxLayout(tab_1)
         
-        emoji_leg = base64.b64decode("8J+mvw==").decode("utf-8")  # 🦿
-        emoji_bone = base64.b64decode("8J+mtA==").decode("utf-8")  # 🦴
-        emoji_ribbon = base64.b64decode("8J+Ol++4jw==").decode("utf-8")  # 🎗️
-        emoji_globe_wireframe = base64.b64decode("8J+MkA==").decode("utf-8") # 🌐
-        emoji_controller = base64.b64decode("8J+Org==").decode("utf-8") # 🎮
-        emoji_folder_closed = base64.b64decode("8J+TgQ==").decode("utf-8") # 📁
-        emoji_color_palette = base64.b64decode("8J+OqA==").decode("utf-8") # 🎨
+        emoji_leg = base64.b64decode("8J+mvw==").decode("utf-8")  # ??
+        emoji_bone = base64.b64decode("8J+mtA==").decode("utf-8")  # ??
+        emoji_ribbon = base64.b64decode("8J+Ol++4jw==").decode("utf-8")  # ???
+        emoji_globe_wireframe = base64.b64decode("8J+MkA==").decode("utf-8") # ??
+        emoji_controller = base64.b64decode("8J+Org==").decode("utf-8") # ??
+        emoji_folder_closed = base64.b64decode("8J+TgQ==").decode("utf-8") # ??
+        emoji_color_palette = base64.b64decode("8J+OqA==").decode("utf-8") # ??
         
         #
         jnt_manip_grp = QGroupBox("Joint's Manipulators")
@@ -206,7 +287,7 @@ class EDG707_002(QMainWindow):
         sel_grp_layout.addWidget(ren_manip_btn)
         
         ikCreate_button.clicked.connect(self.create_IK)
-        poleV_button.clicked.connect(self.create_PoleVector)
+        poleV_button.clicked.connect(self.create_PoleVector_Dialog)
         ribbon_tool.clicked.connect(self.show_ribbon_tool)
         axis_vis.clicked.connect(self.toggle_Axis_Display_Joints)
 
@@ -225,6 +306,10 @@ class EDG707_002(QMainWindow):
         tab_widget.addTab(tab_3, "Custom")
         tab_widget.addTab(tab_4, "Info")
         
+    def create_PoleVector_Dialog(self):
+    # Show the pole vector creation dialog
+        self.dist_spinBox_UI.show()
+    
     def open_codeEditor(self, button=None):
         # If editing, pass the button's current name and code
         if button:
@@ -246,30 +331,24 @@ class EDG707_002(QMainWindow):
         
     def create_new_button(self, button_name, code):
         if not button_name:
-            button_name = "Custom Button"  # Default name if no name is provided
+            button_name = "Custom Button"
+            
+        # Create draggable button
+        new_button = DraggableButton(button_name)
+        new_button.code = code
         
-        # Custom Button
-        new_button = QtWidgets.QPushButton(button_name)
-        new_button.code = code  # Store the code as an attribute of the button
-        
-        # Safely execute the code without closing the window
         def execute_code():
             try:
-                # Execute the code in a context where all classes are defined
                 exec(new_button.code, globals())
             except Exception as e:
                 cmds.warning(f"Error executing code: {str(e)}")
             finally:
-                # Bring the main window to the front after executing code
                 self.bring_to_front()
 
         new_button.clicked.connect(execute_code)
-        
-        # Add right-click context menu for deletion and editing
         new_button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         new_button.customContextMenuRequested.connect(lambda pos: self.show_context_menu(new_button, pos))
-        
-        # Add the button to the scroll layout
+    
         self.scroll_layout.addWidget(new_button)
         
     def show_context_menu(self, button, pos):
@@ -393,6 +472,7 @@ class EDG707_002(QMainWindow):
             cmds.warning("No color selected.")
             return
         
+        cmds.undoInfo(openChunk=True)
         # Normalize the color values to the range [0, 1]
         color = [palette.red() / 255, palette.green() / 255, palette.blue() / 255]
         
@@ -404,35 +484,35 @@ class EDG707_002(QMainWindow):
             return
         
         # Iterate over the selected objects
-        for obj in sel:
+        for i in sel:
             # Check if the object is a joint
-            if cmds.objectType(obj, isType="joint"):
-                print(f"Processing joint: {obj}")
+            if cmds.objectType(i, isType="joint"):
+                print(f"Processing joint: {i}")
                 
                 # Enable override and set RGB color for the joint
-                cmds.setAttr(f"{obj}.overrideEnabled", 1)
-                cmds.setAttr(f"{obj}.overrideRGBColors", 1)
-                cmds.setAttr(f"{obj}.overrideColorRGB", color[0], color[1], color[2])
+                cmds.setAttr(f"{i}.overrideEnabled", 1)
+                cmds.setAttr(f"{i}.overrideRGBColors", 1)
+                cmds.setAttr(f"{i}.overrideColorRGB", color[0], color[1], color[2])
+                    
+            else:
+                print(f"Processing joint: {i}")
+            
+                cmds.setAttr(f"{i}.overrideEnabled", 1)
+                cmds.setAttr(f"{i}.overrideRGBColors", 1)
+                cmds.setAttr(f"{i}.overrideColorRGB", color[0], color[1], color[2])
                 
-            elif cmds.objectType(obj, isType="transform"):
-                print(f"Processing joint: {obj}")
-                
-                rel = cmds.listRelatives(obj, ad=True, fullPath=True)
-                for jnt in rel:
-                    cmds.setAttr(f"{jnt}.overrideEnabled", 1)
-                    cmds.setAttr(f"{jnt}.overrideRGBColors", 1)
-                    cmds.setAttr(f"{jnt}.overrideColorRGB", color[0], color[1], color[2])
-                
-            # Process shapes of the object (for non-joint objects)
-            shapes = cmds.listRelatives(obj, shapes=True, fullPath=True) or []
+            # Process shapes of the object (for shape objects)
+            shapes = cmds.listRelatives(i, shapes=True, fullPath=True) or []
             for shape in shapes:
                 print(f"Processing shape: {shape}")
                 cmds.setAttr(f"{shape}.overrideEnabled", 1)
                 cmds.setAttr(f"{shape}.overrideRGBColors", 1)
                 cmds.setAttr(f"{shape}.overrideColorRGB", color[0], color[1], color[2])
-
+        
+        cmds.undoInfo(closeChunk=True)
+        
     def toggle_Axis_Display_Joints(self):
-   
+        cmds.undoInfo(openChunk=True)
         jointList = cmds.ls(sl=1, type="joint")
 		
         if len(jointList) == 0:
@@ -441,6 +521,8 @@ class EDG707_002(QMainWindow):
             currentStateJnts = cmds.getAttr(jnt + ".displayLocalAxis")
             cmds.setAttr(jnt + ".displayLocalAxis", not currentStateJnts)
             
+        cmds.undoInfo(closeChunk=True)
+        
     def on_axis_vis_double_click(self, event):
         jointList = cmds.ls(type="joint")
         if jointList:
@@ -449,54 +531,7 @@ class EDG707_002(QMainWindow):
             for jnt in jointList:
                 cmds.setAttr(jnt + ".displayLocalAxis", not currentStateJnts)
             event.accept()
-
-    def find_perf_vect(self):
-        sel = cmds.ls(sl=1, type="joint")
-
-        #Joints' vector
-        f_Vec = cmds.xform(sel[0], q=1, ws=1,t=1)
-        s_Vec = cmds.xform(sel[1], q=1, ws=1, t=1)
-        t_Vec = cmds.xform(sel[2], q=1, ws=1,t=1)
-
-        #Vector between two joints
-        f_s_Vec = [s_Vec[i] - f_Vec[i] for i in range(3)]
-        f_t_Vec = [t_Vec[i] - f_Vec[i] for i in range(3)]
-
-        #The calculation of projection of vector a on vector b
-        dot_Product = sum(f_s_Vec[i] * f_t_Vec[i] for i in range(3))
-        magnitude = sum(f_t_Vec[i] **2 for i in range(3))
-        projection = [dot_Product / magnitude * f_t_Vec[i] for i in range(3)]
-
-        perpendicular = [f_s_Vec[i] - projection[i] for i in range(3)]
         
-        length = sum(perpendicular[i] **2 for i in range(3)) ** 0.5
-        normalized_perpendicular = [perpendicular[i] / length for i in range(3)]
-
-        dist_multiplier = 4 #You can change this value, if you think that distance from pole vector and leg doesn't fit you
-        
-        pole_Vec_Pos = [s_Vec[i] + normalized_perpendicular[i] * dist_multiplier for i in range(3)]
-        return pole_Vec_Pos
-
-    def create_PoleVector(self):
-        selList = cmds.ls(sl=1)
-        ikSel = cmds.ls(sl=1, type="ikHandle")
-
-        if len(selList) != 4 or len(ikSel) != 1:
-            cmds.warning("Please select 3 joints and 1 ikHandle!")
-            return
-
-        pole_Vec_Pos = self.find_perf_vect()
-
-        crcl = cmds.circle(n=f"PoleV_CTRL", nr=(0,1,0), c=(0,0,0))
-        grp1 = cmds.group(crcl, n="PoleV_xform")
-        grp2 = cmds.group(grp1, n=f"PoleV_adj")
-        grp3 = cmds.group(grp2, n=f"PoleV_topGr")
-
-        cmds.xform(grp3, t=pole_Vec_Pos, ws=1)
-
-        cmds.poleVectorConstraint(crcl[0], ikSel[0], n="poleV_constraint", w=1)
-        cmds.select(crcl)
-
     def create_IK(self):
         fSel = cmds.ls(sl=1, type="joint")
         
@@ -506,14 +541,16 @@ class EDG707_002(QMainWindow):
 
         cmds.joint(e=1, zso=1)
 
-        IK = cmds.ikHandle (n=sel[-1]+"_IKHandle", sj=sel[0], ee=sel[-1], sol="ikRPsolver", srp=1)
+        IK = cmds.ikHandle (n="IKHandle_001", sj=sel[0], ee=sel[-1], sol="ikRPsolver", srp=1)
         
         cmds.select(fSel)
-
+        
     def create_Controller(self):
+        
+        cmds.undoInfo(openChunk=True)
+        
         fSel = cmds.ls(sl=1, type="joint")
 
-        cmds.select(hi=1)
 
         sel = cmds.ls(sl=1)
         selMult = cmds.ls(sl=1, type="joint")
@@ -528,7 +565,7 @@ class EDG707_002(QMainWindow):
                 cnstrGr = cmds.parentConstraint(i, grp3, mo=0)
                 cmds.delete(cnstrGr)
             
-                cnstrCtrl = cmds.parentConstraint(crcl, i, mo=0)
+                #cnstrCtrl = cmds.parentConstraint(crcl, i, mo=0)
 
                 if not sel:
                     cmds.circle(n="Circle_001", nr=(0,1,0), c=(0,0,0))
@@ -543,12 +580,17 @@ class EDG707_002(QMainWindow):
             cnstrGr = cmds.parentConstraint(i, grp3, mo=0)
             cmds.delete(cnstrGr)
             
-            cnstrCtrl = cmds.parentConstraint(crcl, i, mo=0)
+            #cnstrCtrl = cmds.parentConstraint(crcl, i, mo=0)
             
         if not selMult:
             cmds.circle(n="Circle_001", nr=(0,1,0), c=(0,0,0))
 
+        cmds.undoInfo(closeChunk=True)
+        
     def create_Group(self):
+        
+        cmds.undoInfo(openChunk=True)
+        
         sel = cmds.ls(sl=1)
 
         for i in sel:
@@ -564,6 +606,8 @@ class EDG707_002(QMainWindow):
             grp2 = cmds.group(grp1, n="null_adj")
             grp3 = cmds.group(grp2, n="null_topGr")
 
+        cmds.undoInfo(closeChunk=True)
+        
     def sel_Tool(self):
         cmds.select(d=1)
         
@@ -592,19 +636,21 @@ class EDG707_002(QMainWindow):
 
     def renameAll_Tool(self):
         
-        selected = cmds.ls(sl=1)
+        cmds.undoInfo(openChunk=True)
+        
+        selected = cmds.ls(orderedSelection=True)
         
         if not selected:
             cmds.warning("No objects selected!")
             return
         
         get_word = cmds.promptDialog(
-            title = "Rename Tool",
-            message = "Rename to:",
-            button = ["OK","Cancel"],
-            defaultButton = "OK",
-            cancelButton = "Cancel",
-            dismissString = "Cancel",
+            title="Rename Tool",
+            message="Rename to:",
+            button=["OK", "Cancel"],
+            defaultButton="OK",
+            cancelButton="Cancel",
+            dismissString="Cancel",
         )
 
         if get_word != "OK":
@@ -617,16 +663,28 @@ class EDG707_002(QMainWindow):
             return
         
         index = 1
-        
-        for i in selected:
-            new_name = f"{what_word}_{index}"
-            cmds.rename(i, new_name)
-            index+=1
+        order_sel = []
+        if len(selected) == 1:
+            # Rename the single selected object
+            new_obj = cmds.rename(selected[0], what_word)
+            cmds.select(new_obj)
+            
+        else:
+            # Rename multiple objects with 3-digit numbering
+            for obj in selected:
+                new_name = f"{what_word}_{index:03d}"  # Use :03d for 3-digit numbering
+                rename = cmds.rename(obj, new_name)
+                index += 1
+                order_sel.append(rename)
+                
+            cmds.select(order_sel)
 #class Create_Controller(QWidget):
  #   def __init__(self, parent=None):
   #      super(Create_Controller, self).__init__(parent)
    #     self.setWindow
 
+        cmds.undoInfo(closeChunk=True)
+        
 class  CodeEditor_Dialog(QDialog):
     def __init__(self, parent=None, button_name="", code=""):
         super(CodeEditor_Dialog, self).__init__(parent)
@@ -644,7 +702,7 @@ class  CodeEditor_Dialog(QDialog):
         self.layout.addWidget(self.name_input)
         
         #Text Editor
-        self.text_edit = QTextEdit()
+        self.text_edit = CustomTextEdit()
         self.text_edit.setAcceptRichText(True)
         self.text_edit.setPlainText(code)
         self.layout.addWidget(self.text_edit)
@@ -660,6 +718,91 @@ class  CodeEditor_Dialog(QDialog):
     
     def get_button_name(self):
         return self.name_input.text()
+
+class CustomTextEdit(QTextEdit):
+    def __init__(self, parent=None):
+        super(CustomTextEdit, self).__init__(parent)
+        
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Tab:
+            
+            cursor = self.textCursor()
+            cursor.insertText("    ")
+            
+        else:
+            super(CustomTextEdit, self).keyPressEvent(event)
+
+class CreatePoleV(QDialog):
+    def __init__(self, parent=None):
+        super(CreatePoleV, self).__init__(parent)
+        self.poleV_layout = QVBoxLayout(self)
+        
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        
+        self.dist_text = QLabel("Distance:")
+        self.poleV_layout.addWidget(self.dist_text)
+        
+        self.dist_spinBox = QDoubleSpinBox()
+        self.dist_spinBox.setMinimum(0)
+        self.dist_spinBox.setMaximum(1000)
+        self.dist_spinBox.setValue(4)
+        self.poleV_layout.addWidget(self.dist_spinBox)
+        
+        self.dialog_btn_box_poleV = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.dialog_btn_box_poleV.accepted.connect(self.create_PoleVector)
+        self.dialog_btn_box_poleV.rejected.connect(self.reject)
+        self.poleV_layout.addWidget(self.dialog_btn_box_poleV)
+        
+    def find_perf_vect(self):
+        sel = cmds.ls(sl=1, type="joint")
+
+        #Joints' vector
+        f_Vec = cmds.xform(sel[0], q=1, ws=1,t=1)
+        s_Vec = cmds.xform(sel[1], q=1, ws=1, t=1)
+        t_Vec = cmds.xform(sel[2], q=1, ws=1,t=1)
+
+        #Vector between two joints
+        f_s_Vec = [s_Vec[i] - f_Vec[i] for i in range(3)]
+        f_t_Vec = [t_Vec[i] - f_Vec[i] for i in range(3)]
+
+        #The calculation of projection of vector a on vector b
+        dot_Product = sum(f_s_Vec[i] * f_t_Vec[i] for i in range(3))
+        magnitude = sum(f_t_Vec[i] **2 for i in range(3))
+        projection = [dot_Product / magnitude * f_t_Vec[i] for i in range(3)]
+
+        perpendicular = [f_s_Vec[i] - projection[i] for i in range(3)]
+        
+        length = sum(perpendicular[i] **2 for i in range(3)) ** 0.5
+        normalized_perpendicular = [perpendicular[i] / length for i in range(3)]
+        
+        dist_multiplier = self.dist_spinBox.value() #You can change this value, if you think that distance from pole vector and leg doesn't fit you
+        
+        pole_Vec_Pos = [s_Vec[i] + normalized_perpendicular[i] * dist_multiplier for i in range(3)]
+        return pole_Vec_Pos
+
+    def create_PoleVector(self):
+        cmds.undoInfo(openChunk=True)
+        
+        selList = cmds.ls(sl=1)
+        ikSel = cmds.ls(sl=1, type="ikHandle")
+
+        if len(selList) < 3  or len(ikSel) != 1:
+            cmds.warning("Please select 3 joints and 1 ikHandle!")
+            return
+
+        pole_Vec_Pos = self.find_perf_vect()
+
+        crcl = cmds.circle(n=f"PoleV_CTRL", nr=(0,1,0), c=(0,0,0))
+        grp1 = cmds.group(crcl, n="PoleV_xform")
+        grp2 = cmds.group(grp1, n=f"PoleV_adj")
+        grp3 = cmds.group(grp2, n=f"PoleV_topGr")
+
+        cmds.xform(grp3, t=pole_Vec_Pos, ws=1)
+
+        cmds.poleVectorConstraint(crcl[0], ikSel[0], n="poleV_constraint", w=1)
+        cmds.select(crcl)
+
+        cmds.undoInfo(closeChunk=True)
 
 class Ribbon_Tool(QWidget):
     def __init__(self, parent=None):
@@ -704,6 +847,12 @@ class Ribbon_Tool(QWidget):
         self.s_slider.setMinimum(1)
         self.s_slider.setMaximum(10)
         self.s_slider.setValue(4)
+        
+        dist_label = QLabel("Ribbon Width:")
+        self.dist_box = QDoubleSpinBox()
+        self.dist_box.setMinimum(0)
+        self.dist_box.setMaximum(1000)
+        self.dist_box.setValue(1)
 
         btn1 = QPushButton("Create Ribbon")
         #btn2 = QPushButton("Make nHair")
@@ -720,8 +869,11 @@ class Ribbon_Tool(QWidget):
         pop_inner_group_layout.addWidget(number_spans_label, 2, 0, 1, 3)
         pop_inner_group_layout.addLayout(numbers_layout, 3, 0, 1, 3)
         pop_inner_group_layout.addWidget(self.s_slider, 4, 0, 1, 3)
+        
+        pop_inner_group_layout.addWidget(dist_label, 5, 0, 1, 3)
+        pop_inner_group_layout.addWidget(self.dist_box, 5, 1)
 
-        pop_inner_group_layout.addWidget(btn1, 5, 0, 1, 3)
+        pop_inner_group_layout.addWidget(btn1, 6, 0, 1, 3)
         #pop_inner_group_layout.addWidget(btn2, 6, 0, 1, 3)
 
         self.setLayout(pop_widget_layout)
@@ -729,81 +881,86 @@ class Ribbon_Tool(QWidget):
         btn1.clicked.connect(self.create_ribbon)
 
     def create_ribbon(self):
+        #Store a story
+        cmds.undoInfo(openChunk = True)
+        
         sel = cmds.ls(sl=1, type="joint")
         
+        #Check if selected 2 joints
         if len(sel) >= 2:
+            # Store existing follicles and curves before creation
+            existing_follicles = set(cmds.ls(type="follicle", long=True))
+            existing_joints = set(cmds.ls(type="joint", long=True))
+            existing_curves = set(cmds.ls(type="nurbsCurve", long=True))
+            
             curves_array = []
-            dist = 1
-
+            dist = self.dist_box.value()
             for i in sel:
                 pos = cmds.xform(i, q=1, t=1, ws=1)
-
                 mat = cmds.xform(i, q=1, m=1, ws=1)
-
                 x_axis = [mat[0], mat[1], mat[2]]
                 y_axis = [mat[4], mat[5], mat[6]]
                 z_axis = [mat[8], mat[9], mat[10]]
-
                 if self.axis_x.isChecked():
                     chosen_axis = x_axis
                 elif self.axis_y.isChecked():
                     chosen_axis = y_axis
                 else:
                     chosen_axis = z_axis
-
                 fst_pnt = [pos[0] + chosen_axis[0]*dist, pos[1] + chosen_axis[1]*dist, pos[2] + chosen_axis[2]*dist]
                 snd_pnt = [pos[0] - chosen_axis[0]*dist, pos[1] - chosen_axis[1]*dist, pos[2] - chosen_axis[2]*dist]
-
                 cur = cmds.curve(n=f"curve_{i}", p=[fst_pnt, snd_pnt], d=1)
-
                 curves_array.append(cur)
-
+            
             spans = self.s_slider.value()
-            jnts_cnt_nHair = len(sel)-1 
-            edges = spans * jnts_cnt_nHair +1
-
+            jnts_cnt_nHair = len(sel)-1
+            edges = spans * jnts_cnt_nHair + 1
+            
+            # Create lofted surface
             loft = cmds.loft(curves_array, u=1, ar=1, d=3, ss=spans, rn=1, po=0)
-
-            existing_follicles = set(cmds.ls(type="follicle"))
-
+            
+            # Create hair system
             nHair = mel.eval(f"createHair {edges} 1 3 1 0 1 1 1 0 1 1 1")
-
-            created_follicles = set(cmds.ls(type="follicle")) - existing_follicles
-
-            cmds.delete(curves_array)
-
-            # Delete Additional Hair Object (Not needed for Ribbon)
+            
+            # Get newly created follicles
+            new_follicles = set(cmds.ls(type="follicle", long=True)) - existing_follicles
+            
+            # Clean up ALL curves - both our temporary ones and any created by the hair system
+            all_new_curves = set(cmds.ls(type="nurbsCurve", long=True)) - existing_curves
+            for curve in all_new_curves:
+                curve_parent = cmds.listRelatives(curve, parent=True, fullPath=True)
+                if curve_parent:
+                    cmds.delete(curve_parent)
+            
+            # Clean up hair system and nucleus
             hair = cmds.listRelatives(["*hairSystemShape*", "*pfxHairShape*"], parent=1)
             nucl = cmds.ls(type="nucleus")
-            if len(hair)>0:
+            if hair:
                 cmds.delete(hair, nucl)
-
-            fol_sh = cmds.ls("*loftedSurface*Follicle*", type="follicle") #Shape
-            fol = cmds.listRelatives(fol_sh, p=1) #Parent
-            fol_child = cmds.listRelatives(fol, c=1) #All
-            fol_parent_grp = cmds.listRelatives(fol, p=1)
-
-            fol_child_grp = [] #Filtered
-
-            for i in fol_child:
-                if i not in fol_sh:
-                    fol_child_grp.append(i)
-
-            cmds.delete(fol_child_grp)
-            # Deleted
-
-            created_follicles_nonShape = cmds.listRelatives(created_follicles, p=1)
+                
+            # Clean up any existing joints under follicles
+            for follicle in new_follicles:
+                follicle_parent = cmds.listRelatives(follicle, parent=True, fullPath=True)[0]
+                existing_children = cmds.listRelatives(follicle_parent, children=True, type="joint", fullPath=True)
+                if existing_children:
+                    cmds.delete(existing_children)
             
-            #Create Joints in the position of follicles
-            for i in created_follicles_nonShape:
+            # Create new joints
+            for i, follicle in enumerate(new_follicles, 1):
+                follicle_parent = cmds.listRelatives(follicle, parent=True, fullPath=True)[0]
                 cmds.select(clear=True)
-                jnt2create = cmds.joint(n=i+"_JNT", p=[0,0,0])
-                jnt_constr = cmds.parentConstraint(i, jnt2create)
-                cmds.delete(jnt_constr)
-                cmds.parent(jnt2create, i)
-
+                jnt = cmds.joint(n=f"{follicle_parent}_{i:03d}", p=[0,0,0])
+                constraint = cmds.parentConstraint(follicle_parent, jnt)
+                cmds.delete(constraint)
+                cmds.parent(jnt, follicle_parent)
+            
+            cmds.select(clear=True)
+        
         else:
             cmds.warning("You need to select at least 2 joints!")
+        
+        cmds.undoInfo(closeChunk = True)
+        
 
 class Rename_Manip(QWidget):
     def __init__(self, parent=None):
@@ -864,16 +1021,16 @@ class Rename_Manip(QWidget):
                     #Paste the naming onto object
                     new_name_paste = cmds.rename(i, new_name)
                     renamed_obj.append(new_name_paste)
-                    print(f"SUCCESS: Renamed {short_name} → {new_name}")
+                    print(f"SUCCESS: Renamed {short_name} ? {new_name}")
         
         cmds.select(renamed_obj)
-                    
+        
         cmds.warning(f"SUMMARY: Renamed {len(renamed_obj)} of {len(sel)} objects!")
         self.close()
 
 
 
-def show_window():                                          
+def show_window():
     window = EDG707_002()
     window.show()
 
