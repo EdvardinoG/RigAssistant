@@ -68,23 +68,18 @@ class DraggableButton(QtWidgets.QPushButton):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # Store the position where the mouse was pressed
             self.drag_start_position = event.pos()
-            # Start the timer for the drag delay (e.g., 500 ms)
-            self.drag_timer.start(150)  # Adjust the delay as needed
-        super(DraggableButton, self).mousePressEvent(event)  # Call parent class's mousePressEvent
+            self.drag_timer.start(150)
+        super().mousePressEvent(event)  # Simplified super() syntax
 
     def mouseReleaseEvent(self, event):
-        # Stop the timer if the mouse is released before the drag starts
         self.drag_timer.stop()
         if not self.is_dragging:
-            # If not dragging, allow the button to emit the clicked signal
-            super(DraggableButton, self).mouseReleaseEvent(event)
+            super().mouseReleaseEvent(event)  # Simplified super() syntax
         else:
-            # If dragging, reset the button's state
             self.setDown(False)
-            self.is_dragging = False  # Reset the dragging flag
-
+            self.is_dragging = False
+            
     def mouseMoveEvent(self, event):
         # Stop the timer if the mouse moves outside the button before the drag starts
         if self.drag_start_position is not None:

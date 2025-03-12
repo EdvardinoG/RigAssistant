@@ -39,23 +39,18 @@ class DraggableButton(QtWidgets.QPushButton):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # Store the position where the mouse was pressed
             self.drag_start_position = event.pos()
-            # Start the timer for the drag delay (e.g., 500 ms)
-            self.drag_timer.start(150)  # Adjust the delay as needed
-        super(DraggableButton, self).mousePressEvent(event)  # Call parent class's mousePressEvent
+            self.drag_timer.start(150)
+        super().mousePressEvent(event)  # Simplified super() syntax
 
     def mouseReleaseEvent(self, event):
-        # Stop the timer if the mouse is released before the drag starts
         self.drag_timer.stop()
         if not self.is_dragging:
-            # If not dragging, allow the button to emit the clicked signal
-            super(DraggableButton, self).mouseReleaseEvent(event)
+            super().mouseReleaseEvent(event)  # Simplified super() syntax
         else:
-            # If dragging, reset the button's state
             self.setDown(False)
-            self.is_dragging = False  # Reset the dragging flag
-
+            self.is_dragging = False
+            
     def mouseMoveEvent(self, event):
         # Stop the timer if the mouse moves outside the button before the drag starts
         if self.drag_start_position is not None:
@@ -969,6 +964,8 @@ class Rename_Manip(QWidget):
         self.ok_btn.clicked.connect(self.rename_selected)
 
     def rename_selected(self):
+        cmds.undoInfo(openChunk=True)
+        
         search_text = self.txt_1.text()
         replace_text = self.txt_2.text()
         
@@ -998,6 +995,7 @@ class Rename_Manip(QWidget):
         
         cmds.warning(f"SUMMARY: Renamed {len(renamed_obj)} of {len(sel)} objects!")
         self.close()
+        cmds.undoInfo(closeChunk=True)
 
 
 
